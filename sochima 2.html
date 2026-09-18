@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Happy Birthday Sochima ❤️</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      font-family: 'Courier New', monospace;
+      cursor: pointer;
+    }
+
+    canvas {
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Activation screen */
+    #start-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #ff4d9e;
+      text-align: center;
+      transition: opacity 0.7s ease, visibility 0.7s;
+    }
+
+    #start-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    #start-screen h1 {
+      font-size: clamp(1.5rem, 5.5vw, 2.6rem);
+      margin-bottom: 18px;
+      text-shadow: 0 0 15px #ff4d9e;
+      letter-spacing: 2px;
+    }
+
+    #start-screen p {
+      font-size: clamp(0.9rem, 3.2vw, 1.15rem);
+      color: #ffb3d9;
+      margin-bottom: 28px;
+      max-width: 300px;
+      line-height: 1.5;
+    }
+
+    #start-btn {
+      background: transparent;
+      border: 2px solid #ff4d9e;
+      color: #ff4d9e;
+      padding: 13px 34px;
+      font-size: 1.05rem;
+      font-family: inherit;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border-radius: 40px;
+      text-shadow: 0 0 8px #ff4d9e;
+      box-shadow: 0 0 18px rgba(255, 77, 158, 0.4);
+      transition: all 0.3s;
+    }
+
+    #start-btn:hover {
+      background: #ff4d9e;
+      color: #000;
+      box-shadow: 0 0 28px rgba(255, 77, 158, 0.75);
+    }
+
+    /* The message that gets written letter by letter */
+    #message-container {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      text-align: center;
+      pointer-events: none;
+      user-select: none;
+      width: 90%;
+      max-width: 700px;
+    }
+
+    #typed-text {
+      font-size: clamp(1.5rem, 5.5vw, 3.2rem);
+      font-weight: bold;
+      color: #ff4d9e;
+      text-shadow: 
+        0 0 8px #ff4d9e,
+        0 0 18px #ff4d9e,
+        0 0 35px #ff2d7a,
+        0 0 60px #ff2d7a;
+      letter-spacing: 3px;
+      line-height: 1.35;
+      min-height: 1.4em;
+      white-space: pre-wrap;
+    }
+
+    #cursor {
+      display: inline-block;
+      width: 3px;
+      height: 1.1em;
+      background: #ff9ec8;
+      margin-left: 3px;
+      vertical-align: text-bottom;
+      animation: blink 0.7s step-end infinite;
+      box-shadow: 0 0 10px #ff4d9e;
+    }
+
+    #cursor.hidden {
+      display: none;
+    }
+
+    .heart {
+      font-size: clamp(1.6rem, 5vw, 2.8rem);
+      color: #ff6bb5;
+      margin-top: 18px;
+      opacity: 0;
+      transition: opacity 1s ease;
+      text-shadow: 0 0 15px #ff4d9e;
+      animation: heartbeat 1.5s ease-in-out infinite;
+    }
+
+    .heart.show {
+      opacity: 1;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    @keyframes heartbeat {
+      0%, 100% { transform: scale(1); }
+      14% { transform: scale(1.25); }
+      28% { transform: scale(1); }
+      42% { transform: scale(1.15); }
+      56% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Activation screen (appears when QR is scanned) -->
+  <div id="start-screen">
+    <h1>🎂 Birthday Surprise</h1>
+    <p>Scan the QR code or tap below<br>to start the Matrix message</p>
+    <button id="start-btn">ACTIVATE</button>
+  </div>
+
+  <canvas id="matrix"></canvas>
+
+  <div id="message-container">
+    <div id="typed-text"></div>
+    <span id="cursor" class="hidden"></span>
+    <div class="heart" id="heart">❤️</div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+    const startScreen = document.getElementById('start-screen');
+    const startBtn = document.getElementById('start-btn');
+    const typedText = document.getElementById('typed-text');
+    const cursor = document.getElementById('cursor');
+    const heart = document.getElementById('heart');
+
+    // The exact message that will be written letter by letter
+    const fullMessage = "Happy Birthday\nto you Sochima";
+    let charIndex = 0;
+    let animationStarted = false;
+    let typingStarted = false;
+
+    // Matrix rain characters
+    const chars = 'HAPPYBIRTHDAYSOCHIMAソチマ01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*';
+    const charArray = chars.split('');
+
+    let fontSize = 17;
+    let columns;
+    let drops = [];
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      columns = Math.floor(canvas.width / fontSize);
+      drops = [];
+      for (let i = 0; i < columns; i++) {
+        drops[i] = Math.random() * -100;
+      }
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Matrix rain drawing
+    function drawRain() {
+      if (!animationStarted) return;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.font = fontSize + 'px monospace';
+
+      for (let i = 0; i < drops.length; i++) {
+        const text = charArray[Math.floor(Math.random() * charArray.length)];
+        const x = i * fontSize;
+        const y = drops[i] * fontSize;
+
+        const rand = Math.random();
+        if (rand > 0.965) {
+          ctx.fillStyle = '#ffcce0';
+        } else if (rand > 0.8) {
+          ctx.fillStyle = '#ff4d9e';
+        } else {
+          ctx.fillStyle = '#b0104f';
+        }
+
+        ctx.fillText(text, x, y);
+
+        if (y > canvas.height && Math.random() > 0.978) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+    }
+
+    // Type the message letter by letter
+    function typeWriter() {
+      if (charIndex < fullMessage.length) {
+        typedText.textContent += fullMessage.charAt(charIndex);
+        charIndex++;
+        // Slightly random delay for a more digital feel
+        const delay = fullMessage.charAt(charIndex - 1) === '\n' ? 380 : (55 + Math.random() * 70);
+        setTimeout(typeWriter, delay);
+      } else {
+        // Finished typing – hide cursor and show heart
+        cursor.classList.add('hidden');
+        setTimeout(() => {
+          heart.classList.add('show');
+        }, 400);
+      }
+    }
+
+    // Activate everything
+    function activate() {
+      startScreen.classList.add('hidden');
+      animationStarted = true;
+
+      // Start rain immediately
+      // Start typing after a short pause
+      setTimeout(() => {
+        cursor.classList.remove('hidden');
+        typingStarted = true;
+        typeWriter();
+      }, 700);
+    }
+
+    startBtn.addEventListener('click', activate);
+    startScreen.addEventListener('click', (e) => {
+      if (e.target !== startBtn) activate();
+    });
+
+    // Rain loop
+    setInterval(drawRain, 40);
+  </script>
+</body>
+</html>
